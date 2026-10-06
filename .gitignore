@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+
+# generated test fixtures (rebuilt by `npm test` / `npm run fixtures`)
+test/fixtures/
+
+# tooling / editor noise
+.playwright-mcp/
+.DS_Store
+*.log
+npm-debug.log*
+
+# OS / misc
+Thumbs.db

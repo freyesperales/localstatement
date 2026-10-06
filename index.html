@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LocalStatement — PDF statements to CSV/Excel, in your browser</title>
+<meta name="description" content="Convert PDF bank and credit-card statements to clean CSV or Excel entirely in your browser. Nothing is uploaded, no page limits, no account." />
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-2: #fbfcfd;
+    --ink: #121826;
+    --ink-soft: #4a5568;
+    --muted: #8a94a6;
+    --line: #e4e8ef;
+    --brand: #0e7c66;
+    --brand-ink: #0a5a4a;
+    --brand-soft: #e3f3ee;
+    --accent: #1f6feb;
+    --warn: #b4690e;
+    --warn-soft: #fcefd9;
+    --danger: #c0392b;
+    --danger-soft: #fdecea;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c1016; --panel: #141a22; --panel-2: #10151c; --ink: #e8edf4;
+      --ink-soft: #b4beca; --muted: #7d899a; --line: #242c38;
+      --brand: #35c2a2; --brand-ink: #7fe6cd; --brand-soft: #0f2a24; --accent: #5b9bff;
+      --warn: #e0a94a; --warn-soft: #2c2311; --danger: #ef6b5e; --danger-soft: #2c1613;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c1016; --panel: #141a22; --panel-2: #10151c; --ink: #e8edf4;
+    --ink-soft: #b4beca; --muted: #7d899a; --line: #242c38;
+    --brand: #35c2a2; --brand-ink: #7fe6cd; --brand-soft: #0f2a24; --accent: #5b9bff;
+    --warn: #e0a94a; --warn-soft: #2c2311; --danger: #ef6b5e; --danger-soft: #2c1613;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+    line-height: 1.5; -webkit-font-smoothing: antialiased; padding: 0 16px 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header.top { padding: 34px 0 10px; display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 11px; background: var(--brand);
+    color: #fff; display: grid; place-items: center; font-weight: 700; box-shadow: var(--shadow);
+    flex: 0 0 auto;
+  }
+  .logo svg { width: 24px; height: 24px; }
+  h1 { font-size: 1.45rem; margin: 0; letter-spacing: -.02em; }
+  .tagline { color: var(--ink-soft); margin: 2px 0 0; font-size: .95rem; }
+  .theme-btn {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
+    border-radius: 9px; padding: 7px 11px; cursor: pointer; font-size: .85rem;
+  }
+  .privacy {
+    display: flex; align-items: center; gap: 12px; margin: 16px 0 22px; padding: 13px 16px;
+    background: var(--brand-soft); color: var(--brand-ink); border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+    border-radius: var(--radius); font-size: .92rem; font-weight: 500;
+  }
+  .privacy svg { flex: 0 0 auto; width: 22px; height: 22px; }
+  .privacy b { font-weight: 700; }
+
+  .drop {
+    border: 2px dashed var(--line); border-radius: 16px; background: var(--panel);
+    padding: 44px 24px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop.drag { border-color: var(--brand); background: var(--panel-2); }
+  .drop .ico { width: 54px; height: 54px; color: var(--brand); margin-bottom: 6px; }
+  .drop h2 { margin: 6px 0 4px; font-size: 1.1rem; }
+  .drop p { margin: 0; color: var(--muted); font-size: .9rem; }
+  .drop .pick { color: var(--brand); text-decoration: underline; font-weight: 600; }
+
+  .status { margin: 18px 0; padding: 14px 16px; border-radius: var(--radius); font-size: .92rem; display: none; align-items: center; gap: 10px; }
+  .status.show { display: flex; }
+  .status.info { background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
+  .status.err { background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); color: var(--danger); }
+  .spinner { width: 18px; height: 18px; border: 2.5px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .7s linear infinite; flex: 0 0 auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .results { display: none; margin-top: 8px; }
+  .results.show { display: block; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 10px 0 18px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 13px 15px; box-shadow: var(--shadow); }
+  .card .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .card .v { font-size: 1.25rem; font-weight: 700; margin-top: 3px; letter-spacing: -.01em; }
+  .card .v.small { font-size: .98rem; font-weight: 600; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .pill.ok { background: var(--brand-soft); color: var(--brand-ink); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .notice { padding: 11px 14px; border-radius: 10px; font-size: .88rem; margin-bottom: 12px; }
+  .notice.warn { background: var(--warn-soft); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-bottom: 14px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: .74rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  select, .btn { font-family: inherit; font-size: .9rem; }
+  select { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+  .grow { flex: 1 1 auto; }
+  .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  .btn:hover { border-color: var(--brand); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel-2); font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); z-index: 1; }
+  td[contenteditable] { outline: none; }
+  td[contenteditable]:focus { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: .85rem; }
+  td.neg { color: var(--danger); }
+  tr.flag td { background: var(--danger-soft); }
+  td.rownum { color: var(--muted); font-size: .78rem; text-align: right; font-family: var(--mono); }
+  .del { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 6px; }
+  .del:hover { color: var(--danger); background: var(--danger-soft); }
+  .flag-key { font-size: .82rem; color: var(--muted); margin: 10px 2px 0; display: flex; align-items: center; gap: 7px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); display: inline-block; }
+
+  .how { margin-top: 42px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+  .how h3 { margin: 0 0 10px; }
+  .how ol { margin: 0; padding-left: 20px; color: var(--ink-soft); }
+  .how li { margin: 6px 0; }
+  footer { margin-top: 40px; text-align: center; color: var(--muted); font-size: .82rem; }
+  footer a { color: var(--brand); }
+  .export-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 4px; align-items: center; }
+  .export-row .fname { color: var(--muted); font-size: .84rem; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h10l6 6v10a0 0 0 0 1 0 0H4z"/><path d="M14 4v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      </div>
+      <div>
+        <h1>LocalStatement</h1>
+        <p class="tagline">PDF bank &amp; card statements &rarr; clean CSV / Excel. No upload, no limits, no account.</p>
+      </div>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">Toggle theme</button>
+  </header>
+
+  <div class="privacy" role="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+    <span><b>Runs entirely in your browser.</b> Your statement is parsed on this device with pdf.js &mdash; nothing is uploaded to any server, and no account is needed. You can disconnect from the internet after the page loads.</span>
+  </div>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose or drop a PDF statement">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg>
+    <h2>Drop a PDF statement here</h2>
+    <p>or <span class="pick">choose a file</span> &middot; your file never leaves this device</p>
+    <input type="file" id="file" accept="application/pdf,.pdf" class="sr" />
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <section class="results" id="results" aria-live="polite">
+    <div class="cards" id="cards"></div>
+    <div id="warnings"></div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="profileSel">Layout profile</label>
+        <select id="profileSel">
+          <option value="auto">Auto-detected</option>
+          <option value="generic-signed-amount">Generic (date · description · signed amount)</option>
+          <option value="amount-balance">Amount + running balance</option>
+          <option value="debit-credit-balance">Debit / Credit / Balance</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="dateSel">Date order</label>
+        <select id="dateSel">
+          <option value="auto">Auto</option>
+          <option value="mdy">Month / Day / Year</option>
+          <option value="dmy">Day / Month / Year</option>
+        </select>
+      </div>
+      <div class="grow"></div>
+      <button class="btn ghost" id="addRow" type="button">+ Add row</button>
+      <button class="btn" id="reparse" type="button">Re-detect</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="tbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="flag-key" id="flagKey" style="display:none"><span class="swatch"></span> Rows where the running balance doesn&rsquo;t match the amount &mdash; check these.</div>
+
+    <div class="export-row">
+      <button class="btn primary" id="csvBtn" type="button">Download CSV</button>
+      <button class="btn primary" id="xlsxBtn" type="button">Download Excel (.xlsx)</button>
+      <span class="fname" id="fname"></span>
+    </div>
+  </section>
+
+  <section class="how">
+    <h3>How it works</h3>
+    <ol>
+      <li>pdf.js reads the PDF <em>in this tab</em> and extracts every text fragment with its x/y position.</li>
+      <li>Fragments are clustered into rows (by y) and columns (by x). A date at the left and amounts at the right mark a transaction.</li>
+      <li>Three layout profiles are scored and the best-fitting one is auto-selected; you can override it above.</li>
+      <li>If a balance column exists, each step is checked against the amount &mdash; mismatches are flagged so you can fix them in the editable table.</li>
+      <li>Export clean CSV or Excel. Everything happened locally.</li>
+    </ol>
+  </section>
+
+  <footer>
+    LocalStatement &middot; v1 targets digital (text-layer) PDFs, not scans. The editable preview is your safety net &mdash; always reconcile before use.
+    <br/>Development Experiment 062 of dev-experiments-365.
+  </footer>
+</div>
+
+<!-- Parsing core: plain script so it also works when opened via file:// -->
+<script src="statement-parser.js"></script>
+<!-- SheetJS for XLSX export (pinned) -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script type="module">
+  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+
+  const P = window.LocalStatementParser;
+  const $ = (id) => document.getElementById(id);
+  const drop = $('drop'), fileInput = $('file'), statusEl = $('status');
+  const resultsEl = $('results'), cardsEl = $('cards'), warnEl = $('warnings');
+  const tbl = $('tbl'), flagKey = $('flagKey'), fnameEl = $('fname');
+
+  let currentPages = null;     // normalized page model (from pdf.js)
+  let currentResult = null;    // last parse result
+  let currentName = 'statement';
+
+  // ---- theme ---------------------------------------------------------------
+  $('themeBtn').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('ls-theme', next); } catch (e) {}
+  });
+  try { const t = localStorage.getItem('ls-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+
+  // ---- file intake ---------------------------------------------------------
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener('change', (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('drag'); }));
+  drop.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+
+  function setStatus(kind, html) {
+    statusEl.className = 'status show ' + kind;
+    statusEl.innerHTML = (kind === 'info' ? '<span class="spinner"></span>' : '') + '<span>' + html + '</span>';
+  }
+  function clearStatus() { statusEl.className = 'status'; }
+
+  async function handleFile(file) {
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      setStatus('err', 'That doesn&rsquo;t look like a PDF. Please choose a .pdf statement.');
+      return;
+    }
+    currentName = file.name.replace(/\.pdf$/i, '') || 'statement';
+    resultsEl.classList.remove('show');
+    setStatus('info', 'Reading <b>' + escapeHtml(file.name) + '</b> locally&hellip;');
+    try {
+      const buf = await file.arrayBuffer();
+      currentPages = await extractPages(buf);
+      runParse();
+    } catch (err) {
+      console.error(err);
+      setStatus('err', 'Could not read this PDF: ' + escapeHtml(err.message || String(err)) +
+        '. If it is password-protected, remove the password first.');
+    }
+  }
+
+  // Mirror of test/extract-pdf.mjs — same pdf.js API, same page model.
+  async function extractPages(buf) {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false }).promise;
+    const pages = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1 });
+      const tc = await page.getTextContent();
+      const items = tc.items.filter(it => 'str' in it).map(it => ({
+        str: it.str, x: it.transform[4], y: it.transform[5],
+        width: it.width, height: it.height || Math.hypot(it.transform[2], it.transform[3])
+      }));
+      pages.push({ width: viewport.width, height: viewport.height, items });
+    }
+    return pages;
+  }
+
+  // ---- parse + render ------------------------------------------------------
+  function runParse() {
+    const opts = {};
+    const forced = $('profileSel').value;
+    const dateOrder = $('dateSel').value;
+    if (dateOrder === 'mdy') opts.dayFirst = false;
+    else if (dateOrder === 'dmy') opts.dayFirst = true;
+
+    let res = P.parseStatement(currentPages, opts);
+
+    // Manual profile override: re-shape columns if user forced one.
+    if (res.ok && forced !== 'auto' && forced !== res.profile) {
+      res = P.parseStatement(currentPages, Object.assign({}, opts, { forceProfile: forced }));
+      res._forced = forced;
+    }
+    currentResult = res;
+
+    if (!res.ok) {
+      clearStatus();
+      resultsEl.classList.remove('show');
+      setStatus('err', res.warnings.join(' ') +
+        '<br/><br/><b>Tip:</b> if this is a scanned/photographed statement (image only), LocalStatement v1 cannot read it &mdash; OCR is out of scope. Try a digitally-issued PDF from your bank&rsquo;s website.');
+      return;
+    }
+    clearStatus();
+    render(res);
+    resultsEl.classList.add('show');
+  }
+
+  function render(res) {
+    // cards
+    const s = res.sanity;
+    const net = s && s.netChange != null ? money(s.netChange) : money(s ? s.sumOfAmounts : 0);
+    let sanityPill = '<span class="pill ok">n/a</span>';
+    if (s && s.hasBalanceColumn && s.balanceConsistent === true) sanityPill = '<span class="pill ok">&#10003; consistent</span>';
+    else if (s && s.hasBalanceColumn && s.balanceConsistent === false) sanityPill = '<span class="pill warn">' + s.balanceMatches + '/' + s.balanceChecks + ' match</span>';
+    cardsEl.innerHTML =
+      card('Transactions', res.transactions.length) +
+      card('Detected layout', res.profileLabel, true) +
+      card('Sum of amounts', money(s ? s.sumOfAmounts : 0)) +
+      card('Balance check', sanityPill, true);
+
+    // warnings
+    const w = res.warnings.slice();
+    if (res._forced) w.unshift('Layout manually overridden to &ldquo;' + escapeHtml(res._forced) + '&rdquo;.');
+    warnEl.innerHTML = w.length ? '<div class="notice warn">' + w.map(escapeHtml).join('<br/>') + '</div>' : '';
+
+    // table
+    const cols = res.columns;
+    const thead = tbl.querySelector('thead'), tbody = tbl.querySelector('tbody');
+    thead.innerHTML = '<tr><th></th>' + cols.map(c => '<th>' + c.label + '</th>').join('') + '<th></th></tr>';
+    tbody.innerHTML = '';
+    res.transactions.forEach((tx, i) => tbody.appendChild(rowEl(tx, i, cols, res)));
+    flagKey.style.display = (s && s.balanceConsistent === false) ? 'flex' : 'none';
+
+    fnameEl.textContent = currentName + '.csv / .xlsx';
+  }
+
+  function rowEl(tx, i, cols, res) {
+    const tr = document.createElement('tr');
+    tr.dataset.idx = i;
+    const flagged = balanceFlag(res, i);
+    if (flagged) tr.classList.add('flag');
+    let html = '<td class="rownum">' + (i + 1) + '</td>';
+    cols.forEach(c => {
+      const isNum = c.key !== 'date' && c.key !== 'description';
+      let val = tx[c.key];
+      let disp = val == null ? '' : (isNum ? money(val) : val);
+      const cls = isNum ? ('num' + (typeof val === 'number' && val < 0 ? ' neg' : '')) : '';
+      html += '<td contenteditable="true" class="' + cls + '" data-key="' + c.key + '">' + escapeHtml(String(disp)) + '</td>';
+    });
+    html += '<td><button class="del" title="Delete row" aria-label="Delete row">&times;</button></td>';
+    tr.innerHTML = html;
+    tr.querySelector('.del').addEventListener('click', () => { res.transactions.splice(i, 1); render(res); });
+    tr.querySelectorAll('td[contenteditable]').forEach(td => {
+      td.addEventListener('blur', () => commitEdit(td, i, res));
+    });
+    return tr;
+  }
+
+  function commitEdit(td, i, res) {
+    const key = td.dataset.key;
+    const raw = td.textContent.trim();
+    const tx = res.transactions[i];
+    if (key === 'date' || key === 'description') { tx[key] = raw; }
+    else {
+      if (raw === '') { tx[key] = null; }
+      else { const p = P.parseAmount(raw); tx[key] = p ? p.value : (parseFloat(raw.replace(/[^0-9.\-]/g, '')) || 0); }
+    }
+    // recompute net amount for debit/credit edits
+    if (key === 'debit' || key === 'credit') tx.amount = (tx.credit || 0) - (tx.debit || 0);
+    render(res);
+  }
+
+  function balanceFlag(res, i) {
+    const s = res.sanity;
+    if (!s || !s.hasBalanceColumn || s.balanceConsistent !== false) return false;
+    if (i === 0) return false;
+    const a = res.transactions[i - 1], b = res.transactions[i];
+    if (typeof a.balance !== 'number' || typeof b.balance !== 'number' || typeof b.amount !== 'number') return false;
+    return Math.abs((b.balance - a.balance) - b.amount) > 0.011;
+  }
+
+  // ---- controls ------------------------------------------------------------
+  $('reparse').addEventListener('click', () => { if (currentPages) runParse(); });
+  $('profileSel').addEventListener('change', () => { if (currentPages) runParse(); });
+  $('dateSel').addEventListener('change', () => { if (currentPages) runParse(); });
+  $('addRow').addEventListener('click', () => {
+    if (!currentResult) return;
+    const blank = { date: '', description: '', amount: null };
+    currentResult.columns.forEach(c => { if (!(c.key in blank)) blank[c.key] = null; });
+    currentResult.transactions.push(blank);
+    render(currentResult);
+  });
+
+  // ---- export --------------------------------------------------------------
+  $('csvBtn').addEventListener('click', () => {
+    if (!currentResult) return;
+    const csv = P.toCSV(currentResult);
+    downloadBlob(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), currentName + '.csv');
+  });
+  $('xlsxBtn').addEventListener('click', () => {
+    if (!currentResult || typeof XLSX === 'undefined') { setStatus('err', 'Excel library not loaded (are you offline? CSV still works).'); return; }
+    const cols = currentResult.columns;
+    const aoa = [cols.map(c => c.label)];
+    currentResult.transactions.forEach(t => aoa.push(cols.map(c => t[c.key] == null ? '' : t[c.key])));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+    XLSX.writeFile(wb, currentName + '.xlsx');
+  });
+
+  function downloadBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  // ---- utils ---------------------------------------------------------------
+  function card(k, v, small) { return '<div class="card"><div class="k">' + k + '</div><div class="v' + (small ? ' small' : '') + '">' + v + '</div></div>'; }
+  function money(n) { if (typeof n !== 'number' || isNaN(n)) return ''; return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+</script>
+</body>
+</html>
